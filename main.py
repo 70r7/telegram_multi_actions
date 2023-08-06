@@ -6,6 +6,7 @@ from os import listdir, stat
 from os.path import exists
 from random import randint
 from sys import stderr, platform, version_info, exit
+import time
 
 from loguru import logger
 
@@ -20,6 +21,8 @@ logger.add(stderr,
                   "{level: <8}</level> | <cyan>"
                   "{line}</cyan> - <white>{message}</white>")
 
+
+DEBUG = False
 
 class Main:
     @staticmethod
@@ -95,6 +98,9 @@ class Main:
 
     @staticmethod
     def click_button_wrapper(session_name: str):
+        if not DEBUG:
+            time.sleep(randint(1, 1000))
+
         proxy = None
 
         if proxies_json and proxies_json.get(session_name):
@@ -108,6 +114,8 @@ class Main:
         asyncio.run(Actions().click_button(session_name=session_name,
                                            button_target=button_target,
                                            button_id=button_id,
+                                           follow_chat=follow_chat,
+                                           forward_to=forward_to,
                                            session_proxy_string=proxy,
                                            api_id=API_ID,
                                            api_hash=API_HASH))
@@ -134,7 +142,8 @@ class Main:
 
 if __name__ == '__main__':
     print('Telegram channel - https://t.me/n4z4v0d\n'
-          'Donate (any evm network): 0xDEADf12DE9A24b47Da0a43E1bA70B8972F5296F2\n')
+          'Donate (any evm network): 0xDEADf12DE9A24b47Da0a43E1bA70B8972F5296F2\n'
+          'fork source - https://github.com/70r7/telegram_multi_actions\n')
 
     proxies_json = None
     proxies_list = None
@@ -142,6 +151,8 @@ if __name__ == '__main__':
 
     session_files = [current_file[:-8] for current_file in listdir('sessions')
                      if current_file[-8:] == '.session']
+
+    session_files.remove("example")
 
     logger.info(f'Успешно загружно {len(session_files)} сессий')
 
@@ -206,7 +217,7 @@ if __name__ == '__main__':
         case 3:
             messages_data_json = {}
             other_messages_data = []
-            message_target = input('Введите userid/username человека/бота, которому необходимо отправить сообщения: ')
+            message_target = input('Введите userid/username человека/бота/канала, которому необходимо отправить сообщения: ')
             message_source_type = int(input('1. Отправка одного сообщения с каждого аккаунта\n'
                                             '2. Отправка разных сообщений с каждого аккаунта\n'
                                             'Выберите способ загрузки сообщений: '))
@@ -262,9 +273,14 @@ if __name__ == '__main__':
         case 4:
             button_target = input('Введите userid/username человека/бота, кнопку в '
                                   'диалоге которого необходимо нажать: ')
-            button_id = int(input('Введите порядковый номер кнопки, которую необходимо нажать: ')) - 1
+            button_id = int(input('Введите порядковый номер кнопки, которую необходимо нажать(начиная с 1): ')) - 1
 
-            with Pool(processes=threads) as executor:
+            follow_chat = int(input('Мониторить этот чат?\n1 - Да\n2 - Нет\n'))
+            forward_to = "me"
+            if follow_chat == Actions.FOLLOW_CHAT:
+                forward_to = input("Кому прислать сообщение при упоминании? Никнейм без @:\n")
+
+            with Pool(processes=len(session_files)) as executor:
                 executor.map(Main().click_button_wrapper, session_files)
 
         case 5:

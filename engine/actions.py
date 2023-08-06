@@ -5,8 +5,10 @@ from sys import platform, version_info, stderr
 from aiofiles.os import mkdir
 from aiofiles.ospath import exists
 from loguru import logger
-from pyrogram import Client
+from pyrogram import Client, types
 from pyrogram.errors import FloodWait
+
+from random import randint
 
 from errors import exceptions
 
@@ -58,6 +60,9 @@ def get_proxy_dict(proxy_string: str) -> dict | None:
 
 
 class Actions:
+    FOLLOW_CHAT= 1
+    DONT_FOLLOW_CHAT = 2
+
     @staticmethod
     async def create_sessions(api_id: int,
                               api_hash: str) -> None:
@@ -196,9 +201,12 @@ class Actions:
     async def click_button(session_name: str,
                            button_target: int | str,
                            button_id: int,
+                           follow_chat: int,
                            session_proxy_string: str | None,
                            api_id: int,
-                           api_hash: str):
+                           api_hash: str,
+                           forward_to: str = "me"
+                           ):
         proxy_dict = get_proxy_dict(session_proxy_string)
         button_target_formatted = type_conversion(content=button_target)
 
@@ -209,23 +217,46 @@ class Actions:
                      proxy=proxy_dict)
 
         async with app:
-            async for message in app.get_chat_history(button_target_formatted,
-                                                      limit=1,
-                                                      offset_id=-1):
-                while True:
-                    try:
-                        await message.click(button_id)
+            try:
+                async for message in app.get_chat_history(button_target_formatted,
+                                                        limit=100,
+                                                        offset_id=-1):
+                    while True:
+                        message: types.Message
+                        res = None
+                        try:
+                            res = await message.click(button_id)
 
-                    except FloodWait as error:
-                        await asyncio.sleep(error.value)
+                        except FloodWait as error:
+                            await asyncio.sleep(error.value)
 
-                    except TimeoutError:
-                        logger.info(f'{session_name} | TimeOut при нажатии кнопки (возможно она была успешно нажата)')
-                        return
+                        except TimeoutError:
+                            logger.info(f'{session_name} | TimeOut при нажатии кнопки (возможно она была успешно нажата)')
+                            raise StopAsyncIteration
 
-                    else:
-                        logger.success(f'{session_name} | Кнопка успешно нажата')
-                        return
+                        except ValueError:
+                            break
+                            
+                        else:
+                            logger.success(f'{session_name} | Кнопка успешно нажата. Полученный ответ: {res.message if res is not None else ""}')
+                            raise StopAsyncIteration
+                        
+            except StopAsyncIteration:
+                if follow_chat == Actions.FOLLOW_CHAT:
+                    while True:
+                        async for message in app.get_chat_history(button_target_formatted,
+                                                        limit=3,
+                                                        offset_id=-1):
+
+                            if message.mentioned:
+                                try:
+                                    await app.forward_messages(forward_to, message.chat.id, message.id)
+                                    logger.success(f"{session_name} | Меня упомянули. Отправил сообщение {forward_to}")
+                                except Exception as e:
+                                    logger.error(str(e))
+                                return
+
+                        await asyncio.sleep(randint(10, 180))
 
     @staticmethod
     async def click_start_button(session_name: str,
