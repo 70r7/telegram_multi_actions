@@ -6,9 +6,9 @@ from aiofiles.os import mkdir
 from aiofiles.ospath import exists
 from loguru import logger
 from pyrogram import Client, types
-from pyrogram.errors import FloodWait
+from pyrogram.errors import FloodWait, UserChannelsTooMuch
 
-from random import randint
+from random import randint, choice
 
 from errors import exceptions
 
@@ -105,6 +105,70 @@ class Actions:
         logger.success(f'Сессия под названием {session_name}.session успешно создана')
 
     @staticmethod
+    async def get_me(session_name: str,
+                    session_proxy_string: str | None,
+                    api_id: int,
+                    api_hash: str) -> None:
+        
+        proxy_dict = get_proxy_dict(session_proxy_string)
+
+        app = Client(name=session_name,
+                     workdir='sessions',
+                     api_hash=api_hash,
+                     api_id=api_id,
+                     proxy=proxy_dict)
+
+        async with app:
+            usernames = []
+            try:
+                with open("usernames", "r", encoding="utf-8") as f:
+                    usernames = f.read().splitlines()
+            except:
+                pass
+            me = await app.get_me()
+            if me.username not in usernames:
+                with open("usernames", "a", encoding="utf-8") as f:
+                    f.write(f"{me.username}\n")
+
+    @staticmethod
+    async def message_handler(session_name: str,
+                        session_proxy_string: str | None,
+                        targets: list,
+                        forward_to: str,
+                        api_id: int,
+                        api_hash: str) -> None:
+        proxy_dict = get_proxy_dict(session_proxy_string)
+
+        app = Client(name=session_name,
+                     workdir='sessions',
+                     api_hash=api_hash,
+                     api_id=api_id,
+                     proxy=proxy_dict)
+        usernames = []
+        with open("usernames", "r", encoding="utf-8") as f:
+            usernames = f.read().splitlines()
+        async with app:
+            while True:
+                for target in targets:
+                    formatted_target = type_conversion(target)
+                    async for message in app.get_chat_history(formatted_target,
+                                                    limit=5,
+                                                    offset_id=-1):
+                        
+                        for username in usernames:
+                            if username in message.text or message.caption:
+                                try:
+                                    await app.forward_messages(forward_to, message.chat.id, message.id)
+                                    await app.send_message(forward_to, f"Ваш аккаунт @{username} упомянут ")
+                                    logger.success(f"{session_name} | {username} упомянули. Отправил сообщение {forward_to}")
+                                except Exception as e:
+                                    logger.error(str(e))
+                                return
+                        await asyncio.sleep(3)
+
+                await asyncio.sleep(randint(10, 180))
+
+    @staticmethod
     async def join_chat(session_name: str,
                         session_proxy_string: str | None,
                         targets: list,
@@ -130,10 +194,54 @@ class Actions:
                         logger.info(f'{session_name} | FloodWait: {error.value} сек.')
                         await asyncio.sleep(error.value)
 
+                    except UserChannelsTooMuch:
+                        logger.info(f'{session_name} | Количество чатов превышено. Пытаюсь выйти из рандомного чата')
+                        chats = []
+                        async for dialog in app.get_dialogs():
+                            if dialog.chat.id < 0:
+                                chats.append(dialog.chat.id)
+
+                        chat = choice(chats)
+                        await app.leave_chat(chat_id=chat)
+                        logger.success(f'{session_name} | Успешно вышел из чата/канала {chat}')
                     else:
                         logger.success(f'{session_name} | Успешно вступил в чат/канал {current_target} '
                                        f'| [{i + 1}/{len(targets)}]')
                         break
+
+    
+    @staticmethod
+    async def leave_chat(session_name: str,
+                        session_proxy_string: str | None,
+                        targets: list,
+                        api_id: int,
+                        api_hash: str) -> None:
+        
+        proxy_dict = get_proxy_dict(session_proxy_string)
+
+        app = Client(name=session_name,
+                     workdir='sessions',
+                     api_hash=api_hash,
+                     api_id=api_id,
+                     proxy=proxy_dict)
+
+        async with app:
+            for i, current_target in enumerate(targets):
+                current_target_formatted = type_conversion(content=current_target)
+
+                while True:
+                    try:
+                        await app.leave_chat(chat_id=current_target_formatted)
+
+                    except FloodWait as error:
+                        logger.info(f'{session_name} | FloodWait: {error.value} сек.')
+                        await asyncio.sleep(error.value)
+
+                    else:
+                        logger.success(f'{session_name} | Успешно вышел из чата/канала {current_target} '
+                                       f'| [{i + 1}/{len(targets)}]')
+                        break
+
 
     @staticmethod
     async def send_message(session_name: str,
@@ -199,16 +307,15 @@ class Actions:
 
     @staticmethod
     async def click_button(session_name: str,
-                           button_target: int | str,
+                           button_target_data: int | str,
                            button_id: int,
-                           follow_chat: int,
+                        #    follow_chat: int,
                            session_proxy_string: str | None,
                            api_id: int,
                            api_hash: str,
-                           forward_to: str = "me"
+                        #    forward_to: str = "me"
                            ):
         proxy_dict = get_proxy_dict(session_proxy_string)
-        button_target_formatted = type_conversion(content=button_target)
 
         app = Client(name=session_name,
                      workdir='sessions',
@@ -217,7 +324,9 @@ class Actions:
                      proxy=proxy_dict)
 
         async with app:
-            try:
+            # try:
+            for current_target in button_target_data:
+                button_target_formatted = type_conversion(content=current_target)
                 async for message in app.get_chat_history(button_target_formatted,
                                                         limit=100,
                                                         offset_id=-1):
@@ -232,31 +341,33 @@ class Actions:
 
                         except TimeoutError:
                             logger.info(f'{session_name} | TimeOut при нажатии кнопки (возможно она была успешно нажата)')
-                            raise StopAsyncIteration
+                            # raise StopAsyncIteration
+                            return
 
                         except ValueError:
                             break
                             
                         else:
-                            logger.success(f'{session_name} | Кнопка успешно нажата. Полученный ответ: {res.message if res is not None else ""}')
-                            raise StopAsyncIteration
+                            logger.success(f'{session_name} | Кнопка успешно нажата({button_target_formatted}). Полученный ответ: {res.message if res is not None else ""}')
+                            # raise StopAsyncIteration
+                            return
                         
-            except StopAsyncIteration:
-                if follow_chat == Actions.FOLLOW_CHAT:
-                    while True:
-                        async for message in app.get_chat_history(button_target_formatted,
-                                                        limit=3,
-                                                        offset_id=-1):
+            # except StopAsyncIteration:
+            #     if follow_chat == Actions.FOLLOW_CHAT:
+            #         while True:
+            #             async for message in app.get_chat_history(button_target_formatted,
+            #                                             limit=3,
+            #                                             offset_id=-1):
 
-                            if message.mentioned:
-                                try:
-                                    await app.forward_messages(forward_to, message.chat.id, message.id)
-                                    logger.success(f"{session_name} | Меня упомянули. Отправил сообщение {forward_to}")
-                                except Exception as e:
-                                    logger.error(str(e))
-                                return
+            #                 if message.mentioned:
+            #                     try:
+            #                         await app.forward_messages(forward_to, message.chat.id, message.id)
+            #                         logger.success(f"{session_name} | Меня упомянули. Отправил сообщение {forward_to}")
+            #                     except Exception as e:
+            #                         logger.error(str(e))
+            #                     return
 
-                        await asyncio.sleep(randint(10, 180))
+            #             await asyncio.sleep(randint(10, 180))
 
     @staticmethod
     async def click_start_button(session_name: str,

@@ -37,7 +37,26 @@ class Main:
                 return
 
     @staticmethod
+    def get_me_wrapper(session_name: str) -> None:
+        proxy = None
+
+        if proxies_json and proxies_json.get(session_name):
+            proxy = proxies_json[session_name]
+
+        else:
+            if proxies_list:
+                proxy = proxies_list.pop(randint(0, len(proxies_list)))
+                proxies_list.append(proxy)
+
+        asyncio.run(Actions().get_me(session_name=session_name,
+                                        session_proxy_string=proxy,
+                                        api_id=API_ID,
+                                        api_hash=API_HASH))
+
+    @staticmethod
     def join_chat_wrapper(session_name: str) -> None:
+        if not DEBUG:
+            time.sleep(randint(min_delay, max_delay))
         proxy = None
 
         if proxies_json and proxies_json.get(session_name):
@@ -97,9 +116,28 @@ class Main:
                                            api_hash=API_HASH))
 
     @staticmethod
+    def message_handler_wrapper(session_name: str):
+        proxy = None
+
+        if proxies_json and proxies_json.get(session_name):
+            proxy = proxies_json[session_name]
+
+        else:
+            if proxies_list:
+                proxy = proxies_list.pop(randint(0, len(proxies_list)))
+                proxies_list.append(proxy)
+
+        asyncio.run(Actions().message_handler(session_name=session_name,
+                                              session_proxy_string=proxy,
+                                              targets=button_target_data,
+                                              forward_to=forward_to,
+                                              api_hash=API_HASH,
+                                              api_id=API_ID))
+
+    @staticmethod
     def click_button_wrapper(session_name: str):
         if not DEBUG:
-            time.sleep(randint(1, 1000))
+            time.sleep(randint(min_delay, max_delay))
 
         proxy = None
 
@@ -112,10 +150,10 @@ class Main:
                 proxies_list.append(proxy)
 
         asyncio.run(Actions().click_button(session_name=session_name,
-                                           button_target=button_target,
+                                           button_target_data=button_target_data,
                                            button_id=button_id,
-                                           follow_chat=follow_chat,
-                                           forward_to=forward_to,
+                                        #    follow_chat=follow_chat,
+                                        #    forward_to=forward_to,
                                            session_proxy_string=proxy,
                                            api_id=API_ID,
                                            api_hash=API_HASH))
@@ -193,10 +231,14 @@ if __name__ == '__main__':
                             '3. Telegram Mass Message Sender\n'
                             '4. Telegram Mass Click Inline Buttons\n'
                             '5. Telegram Send Start Command With Referral Link\n'
+                            '6. Save usernames\n'
                             'Выберите ваше действие: '))
 
     if user_action not in [1]:
         threads = int(input('Threads: '))
+
+    max_delay = int(input("Максимальная задержка(сек.):\n") or 1)
+    min_delay = int(input("Минимальная задержка(сек.):\n") or 0)
 
     print('')
 
@@ -271,17 +313,27 @@ if __name__ == '__main__':
                 executor.map(Main().send_message_wrapper, session_files)
 
         case 4:
-            button_target = input('Введите userid/username человека/бота, кнопку в '
-                                  'диалоге которого необходимо нажать: ')
+            button_target = input('Перетяните .txt, в котором с новой строки указаны '
+                                     'id чатов/каналов: ')
+
+            with open(button_target, 'r', encoding='utf-8-sig') as file:
+                button_target_data = [row.strip() for row in file]
+
+            # button_target = input('Введите userid/username человека/бота, кнопку в '
+            #                       'диалоге которого необходимо нажать: ')
             button_id = int(input('Введите порядковый номер кнопки, которую необходимо нажать(начиная с 1): ')) - 1
 
-            follow_chat = int(input('Мониторить этот чат?\n1 - Да\n2 - Нет\n'))
+            follow_chat = int(input('Мониторить эти чаты?\n1 - Да\n2 - Нет\n'))
             forward_to = "me"
             if follow_chat == Actions.FOLLOW_CHAT:
                 forward_to = input("Кому прислать сообщение при упоминании? Никнейм без @:\n")
 
-            with Pool(processes=len(session_files)) as executor:
+            with Pool(processes=threads) as executor:
                 executor.map(Main().click_button_wrapper, session_files)
+
+            if follow_chat == Actions.FOLLOW_CHAT:
+                with Pool(processes=threads) as executor:
+                    executor.map(Main().message_handler_wrapper, [session_files[randint(0, len(session_files))-1]])
 
         case 5:
             referral_bot_link = input('Введите реферальную ссылку на бота: ').replace('https://',
@@ -292,6 +344,11 @@ if __name__ == '__main__':
 
             with Pool(processes=threads) as executor:
                 executor.map(Main().click_start_button_wrapper, session_files)
+            
+
+        case 6:
+            with Pool(processes=threads) as executor:
+                executor.map(Main().get_me_wrapper, session_files)
 
         case _:
             logger.error('Такой функции не обнаружено')
@@ -301,3 +358,6 @@ if __name__ == '__main__':
     print('')
     logger.info('Работа успешно завершена')
     input('Press Any Key To Exit..')
+
+
+# Мейн процесс который будет парсить результ
