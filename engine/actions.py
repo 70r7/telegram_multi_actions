@@ -327,30 +327,33 @@ class Actions:
             # try:
             for current_target in button_target_data:
                 button_target_formatted = type_conversion(content=current_target)
-                async for message in app.get_chat_history(button_target_formatted,
-                                                        limit=100,
-                                                        offset_id=-1):
-                    while True:
-                        message: types.Message
-                        res = None
-                        try:
-                            res = await message.click(button_id)
+                try:
+                    async for message in app.get_chat_history(button_target_formatted,
+                                                            limit=100,
+                                                            offset_id=-1):
+                        while True:
+                            message: types.Message
+                            res = None
+                            try:
+                                res = await message.click(button_id)
 
-                        except FloodWait as error:
-                            await asyncio.sleep(error.value)
+                            except FloodWait as error:
+                                await asyncio.sleep(error.value)
 
-                        except TimeoutError:
-                            logger.info(f'{session_name} | TimeOut при нажатии кнопки (возможно она была успешно нажата)')
-                            # raise StopAsyncIteration
-                            return
+                            except TimeoutError:
+                                logger.info(f'{session_name} | TimeOut при нажатии кнопки (возможно она была успешно нажата)')
+                                raise StopAsyncIteration
+                                # break
 
-                        except ValueError:
-                            break
-                            
-                        else:
-                            logger.success(f'{session_name} | Кнопка успешно нажата({button_target_formatted}). Полученный ответ: {res.message if res is not None else ""}')
-                            # raise StopAsyncIteration
-                            return
+                            except ValueError:
+                                break
+                                
+                            else:
+                                logger.success(f'{session_name} | Кнопка успешно нажата({button_target_formatted}). Полученный ответ: {res.message if res is not None else ""}')
+                                raise StopAsyncIteration
+                                # break
+                except StopAsyncIteration:
+                    pass
                         
             # except StopAsyncIteration:
             #     if follow_chat == Actions.FOLLOW_CHAT:
