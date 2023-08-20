@@ -152,7 +152,7 @@ class TelegramSession:
                 if path[2].isdigit():
                     result.append(f'-100{path[2]}:{path[3]}')
                 else:
-                    result.append(f'{path[2]}:{path[3]}')
+                    result.append(f'{path[1]}:{path[2]}')
             return result
         
         if len(path) == 1:
