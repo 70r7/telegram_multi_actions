@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 from random import choice, randint
 
-from pyrogram import Client
+from pyrogram.client import Client
 from pyrogram.types import Message, User
 from pyrogram.errors import FloodWait, UserChannelsTooMuch
 
@@ -149,7 +149,10 @@ class TelegramSession:
             result = [] 
             for link in data:
                 path = urlparse(link).path.split('/')
-                result.append(f'-100{path[2]}:{path[3]}')
+                if path[2].isdigit():
+                    result.append(f'-100{path[2]}:{path[3]}')
+                else:
+                    result.append(f'{path[2]}:{path[3]}')
             return result
         
         if len(path) == 1:
