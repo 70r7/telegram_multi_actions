@@ -256,7 +256,7 @@ username: @{self.me.username}\n\
                     break
 
                 else:
-                    await self.success(f'Кнопка успешно нажата({button_id}). Полученный ответ: {res.message if not isinstance(res, (str, None)) else ""}') #type: ignore
+                    await self.success(f'Кнопка успешно нажата({button_id}). Полученный ответ: {res.message if not (isinstance(res, str) or res is None) else ""}') #type: ignore
                     break
 
 
