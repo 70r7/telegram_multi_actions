@@ -2,6 +2,5 @@ venv
 __pycache__
 usernames
 chats.txt
-settings.json
 main.py
 engine

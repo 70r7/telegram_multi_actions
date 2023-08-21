@@ -8,8 +8,8 @@ from urllib.parse import urlparse
 from random import choice, randint
 
 from pyrogram.client import Client
-from pyrogram.types import Message, User
-from pyrogram.errors import FloodWait, UserChannelsTooMuch
+from pyrogram.types import Message, User, InlineQueryResult
+from pyrogram.errors import FloodWait, UserChannelsTooMuch, UserAlreadyParticipant
 
 from typing import Union, List
 from re import match
@@ -28,8 +28,22 @@ logger.add(stderr,
                 "{level: <8}</level> | <cyan>"
                 "{line}</cyan> - <white>{message}</white>")
 
-bot_token=input("bot token: ")
-chat_id=input("ваш telegram id: ")
+
+settings = {}
+
+if exists("settings.json") and stat('proxies.json').st_size > 0:
+    with open("settings.json", "r", encoding='utf-8-sig') as f:
+        settings = json.load(f)
+
+
+delay_range = settings.get("delay") or input("Задержка между аккаунтами(в секундах) в формате: min max(например: 10 120)\n")
+min_delay, max_delay = delay_range.split(' ')
+
+min_delay = int(min_delay)
+max_delay = int(max_delay)
+
+bot_token=settings.get("bot_token") or input("bot token: ")
+chat_id=settings.get("user_id") or input("ваш telegram id: ")
 
 # sessions = set()
 
@@ -76,33 +90,33 @@ class TelegramSession:
     async def success(self, message: str):
         logger.success(f"{self.name}{message}")
         
-        log = f"success: `{message}`\n\
-                ```------------------```\n\
-                session: `{self.session_filename}` \n\
-                username: @{self.me.username}\n\
-                "
+        log = f"success:\n {message}\n\
+```------------------```\n\
+session: `{self.session_filename}` \n\
+username: @{self.me.username}\n\
+"
 
         await self.send_markdown_message(text=log)
     
     async def error(self, message: str):
         logger.error(f"{self.name}{message}")
         
-        log = f"error: `{message}`\n\
-                ```------------------```\n\
-                session: `{self.session_filename}` \n\
-                username: @{self.me.username}\n\
-                "
+        log = f"error:\n {message}\n\
+```------------------```\n\
+session: `{self.session_filename}` \n\
+username: @{self.me.username}\n\
+"
 
         await self.send_markdown_message(text=log)
     
     async def info(self, message: str):
         logger.info(f"{self.name}{message}")
         
-        log = f"info: `{message}`\n\
-                ```------------------```\n\
-                session: `{self.session_filename}` \n\
-                username: @{self.me.username}\n\
-                "
+        log = f"info:\n {message}\n\
+```------------------```\n\
+session: `{self.session_filename}` \n\
+username: @{self.me.username}\n\
+"
 
         await self.send_markdown_message(text=log)
 
@@ -142,26 +156,34 @@ class TelegramSession:
         if not data:
             raise EmptyFile
         
-        parsed_url = urlparse(data[0])
-        path = parsed_url.path.split('/')
+        result = []
+        for element in data:
+            parsed_url = urlparse(element)
+            path = parsed_url.path.split('/')
 
-        if len(path) == 4:
-            result = [] 
-            for link in data:
-                path = urlparse(link).path.split('/')
+            if len(path) == 4:
                 if path[2].isdigit():
                     result.append(f'-100{path[2]}:{path[3]}')
                 else:
                     result.append(f'{path[1]}:{path[2]}')
-            return result
-        
-        if len(path) == 1:
-            result = []
-            for id in data:
-                result.append(f'{id}:{-1}')
-            return result
+                continue
+            
+            if len(path) == 3:
+                result.append(f'{path[1]}:{path[2]}')
+                continue
 
-        return data
+            
+            if len(path) == 1:
+                result.append(f'{element}:{-1}')
+                continue
+            
+            if len(path) == 2:
+                result.append(f"@{path[1]}" if not path[1].startswith("+") else element)
+                continue
+
+            result.append(element)
+
+        return result
 
     async def join_chat(self, join_link):
         async with self.client as app:
@@ -182,9 +204,13 @@ class TelegramSession:
 
                     chat = choice(chats)
                     await app.leave_chat(chat_id=chat)
-                    await self.success(f'Успешно вышел из чата/канала {chat}')
+                    await self.success(f'Успешно вышел из чата/канала `{chat}`')
+
+                except UserAlreadyParticipant:
+                    await self.error(f"Не удалось вступить в {join_link}. Я уже состою в этом чате")
+                    break
                 else:
-                    await self.success(f'Вступил в чат {joined_chat.title}[{join_link}]')
+                    await self.success(f'Вступил в чат `{joined_chat.title}` `[`{join_link}`]`')
                     break
 
     async def leave_chat(self):
@@ -205,6 +231,7 @@ class TelegramSession:
                 message_id = await self._search_post_with_button(chat_id, app)
             
             message = await app.get_messages(chat_id, message_id)
+            # print(message)
 
             if not isinstance(message, Message):
                 return await self.error(f"Не удалось получить сообщение с кнопкой")
@@ -213,6 +240,10 @@ class TelegramSession:
                 res = None
                 try:
                     res = await message.click(button_id)
+                    # print(res)
+                    # if isinstance(res, str) and res.startswith("https://t.me/"):
+                    #     res = await app.
+                    #     print(res)
 
                 except FloodWait as error:
                     await asyncio.sleep(error.value) #type: ignore
@@ -225,7 +256,7 @@ class TelegramSession:
                     break
 
                 else:
-                    await self.success(f'Кнопка успешно нажата({button_id}). Полученный ответ: {res.message if res is not None else ""}') #type: ignore
+                    await self.success(f'Кнопка успешно нажата({button_id}). Полученный ответ: {res.message if not isinstance(res, (str, None)) else ""}') #type: ignore
                     break
 
 
@@ -252,7 +283,7 @@ async def clicker():
                                     'ссылки на посты или айди каналов: ')
 
     links = TelegramSession.parse_data_from_file(click_chat_target)
-
+    print(links)
     for sess in session_files:
         ts = TelegramSession(sess, proxy=proxies_json.get(sess) if proxies_json else "")
         await ts.start()
@@ -297,12 +328,6 @@ if __name__ == "__main__":
                             '2. Telegram Mass Click Inline Buttons\n'
                             'Выберите ваше действие: '))
     
-
-    delay_range = input("Задержка между аккаунтами(в секундах) в формате: min max(например: 10 120)\n")
-    min_delay, max_delay = delay_range.split(' ')
-
-    min_delay = int(min_delay)
-    max_delay = int(max_delay)
 
     match user_action:
         case 1:
