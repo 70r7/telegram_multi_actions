@@ -261,6 +261,20 @@ username: @{self.me.username}\n\
 
 
 
+async def send_end_message():
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+
+    payload = {
+        "chat_id": chat_id, 
+        "text": "Закончил работу",
+        "parse_mode": "Markdown"
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=payload) as response:
+            result = await response.json()
+            return result
+
 async def joiner():
     join_chat_target = input('Перетяните .txt, в котором с новой строки указаны '
                                      'username\'s / join link\'s чатов/каналов: ')
@@ -277,13 +291,15 @@ async def joiner():
         
         await asyncio.sleep(randint(min_delay, max_delay))
 
+    await send_end_message()
+
 
 async def clicker():
     click_chat_target = input('Перетяните .txt, в котором с новой строки указаны '
                                     'ссылки на посты или айди каналов: ')
 
     links = TelegramSession.parse_data_from_file(click_chat_target)
-    print(links)
+    # print(links)
     for sess in session_files:
         ts = TelegramSession(sess, proxy=proxies_json.get(sess) if proxies_json else "")
         await ts.start()
@@ -293,7 +309,7 @@ async def clicker():
         
         await asyncio.sleep(randint(min_delay, max_delay))
 
-    
+    await send_end_message()
 
 if __name__ == "__main__":
     proxies_json = None
