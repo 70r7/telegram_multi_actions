@@ -4,3 +4,5 @@ usernames
 chats.txt
 main.py
 engine
+settings.json
+*.session

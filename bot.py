@@ -7,8 +7,9 @@ from urllib.parse import urlparse
 
 from random import choice, randint
 
+from pyrogram.raw.types.messages.bot_callback_answer import BotCallbackAnswer
 from pyrogram.client import Client
-from pyrogram.types import Message, User, InlineQueryResult
+from pyrogram.types import Message, User
 from pyrogram.errors import FloodWait, UserChannelsTooMuch, UserAlreadyParticipant
 
 from typing import Union, List
@@ -46,6 +47,25 @@ bot_token=settings.get("bot_token") or input("bot token: ")
 chat_id=settings.get("user_id") or input("ваш telegram id: ")
 
 # sessions = set()
+
+
+async def http_get(url: str, referer: str):
+    headers = {
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Language": "ru,en;q=0.9,en-GB;q=0.8,en-US;q=0.7",
+        "Referer": referer,
+        "Sec-Ch-Ua": '"Not/A)Brand";v="99", "Microsoft Edge";v="115", "Chromium";v="115", "Microsoft Edge WebView2";v="115"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.203"
+    }
+    async with aiohttp.ClientSession() as sess:
+        async with sess.get(url, headers=headers) as resp:
+            return await resp.text()
 
 class TelegramSession:
     WORKDIR = "sessions"
@@ -90,33 +110,33 @@ class TelegramSession:
     async def success(self, message: str):
         logger.success(f"{self.name}{message}")
         
-        log = f"success:\n {message}\n\
-```------------------```\n\
-session: `{self.session_filename}` \n\
-username: @{self.me.username}\n\
-"
+        log = f"""success:\n {message}
+```------------------```
+session: `{self.session_filename}`
+username: @{self.me.username}
+"""
 
         await self.send_markdown_message(text=log)
     
     async def error(self, message: str):
         logger.error(f"{self.name}{message}")
         
-        log = f"error:\n {message}\n\
-```------------------```\n\
-session: `{self.session_filename}` \n\
-username: @{self.me.username}\n\
-"
+        log = f"""error:\n {message}
+```------------------```
+session: `{self.session_filename}`
+username: @{self.me.username}
+"""
 
         await self.send_markdown_message(text=log)
     
     async def info(self, message: str):
         logger.info(f"{self.name}{message}")
         
-        log = f"info:\n {message}\n\
-```------------------```\n\
-session: `{self.session_filename}` \n\
-username: @{self.me.username}\n\
-"
+        log = f"""info:\n {message}
+```------------------```
+session: `{self.session_filename}`
+username: @{self.me.username}
+"""
 
         await self.send_markdown_message(text=log)
 
@@ -215,6 +235,15 @@ username: @{self.me.username}\n\
 
     async def leave_chat(self):
         raise NotImplementedError
+    
+
+    async def start_ref_bot(self, url):
+        parsed_url = urlparse(res)
+        query = parsed_url.query.split('=')
+        async with self.client as app:
+            res = await app.send_message(chat_id=parsed_url.path.split('/')[1], text=f"/{query[0]} {' '.join(query[1:])}")
+
+        await self.success(f"Активировал реф бота")
 
     async def _search_post_with_button(self, chat_id: str | int, app: Client) -> int:
         async for message in app.get_chat_history(chat_id=chat_id,
@@ -240,10 +269,21 @@ username: @{self.me.username}\n\
                 res = None
                 try:
                     res = await message.click(button_id)
-                    # print(res)
-                    # if isinstance(res, str) and res.startswith("https://t.me/"):
-                    #     res = await app.
-                    #     print(res)
+                    print(res)
+                    if isinstance(res, str) and res.startswith("https://t.me"):
+                        parsed_url = urlparse(res)
+                        query = parsed_url.query.split('=')
+                        if "BlessMeBot" in res:
+                            logger.info(f"Найден RandomGodBot")
+                            start_param = parsed_url.query.split("&")[0].replace("startapp=", "")
+
+                            try:
+                                res = await http_get(f"https://randomgodbot.com/api/lottery/requestCaptcha.php?userId={self.me.id}&startParam={start_param}", f"https://randomgodbot.com/api/lottery/?tgWebAppStartParam={start_param}")
+                            except Exception as e:
+                                await self.error(f"Не удалось вступить в розыгрыш в RandomGodBot, {e}")
+
+                        else:
+                            res = await app.send_message(chat_id=parsed_url.path.split('/')[1], text=f"/{query[0]} {' '.join(query[1:])}")
 
                 except FloodWait as error:
                     await asyncio.sleep(error.value) #type: ignore
@@ -256,7 +296,7 @@ username: @{self.me.username}\n\
                     break
 
                 else:
-                    await self.success(f'Кнопка успешно нажата({button_id}). Полученный ответ: {res.message if not (isinstance(res, str) or res is None) else ""}') #type: ignore
+                    await self.success(f'Кнопка успешно нажата({button_id}). Полученный ответ: ``` {res.message if isinstance(res, BotCallbackAnswer) else res}```') #type: ignore
                     break
 
 
@@ -311,6 +351,25 @@ async def clicker():
 
     await send_end_message()
 
+async def ref_clicker():
+    click_chat_target = input('Перетяните .txt, в котором с новой строки указаны '
+                                'ссылки на посты или айди каналов: ')
+
+    with open(click_chat_target, "r", encoding="utf-8") as f:
+        links = f.read().splitlines()
+
+    for sess in session_files:
+        ts = TelegramSession(sess, proxy=proxies_json.get(sess) if proxies_json else "")
+        await ts.start()
+        for link in links:
+            await ts.start_ref_bot(link)
+
+        await asyncio.sleep(randint(min_delay, max_delay))
+    
+    await send_end_message()
+
+    
+
 if __name__ == "__main__":
     proxies_json = None
     proxies_list = None
@@ -342,6 +401,7 @@ if __name__ == "__main__":
 
     user_action = int(input('\n1. Telegram Mass Joiner\n'
                             '2. Telegram Mass Click Inline Buttons\n'
+                            '3. Telegram Send Start Command With Referral Link\n'
                             'Выберите ваше действие: '))
     
 
@@ -353,6 +413,9 @@ if __name__ == "__main__":
 
         case 2:
             asyncio.run(clicker())
+        
+        case 3:
+            asyncio.run(ref_clicker())
 
         case _:
             logger.error('Такой функции не обнаружено')
