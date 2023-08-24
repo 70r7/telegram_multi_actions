@@ -102,10 +102,15 @@ class TelegramSession:
             "parse_mode": "Markdown"
         }
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload) as response:
-                result = await response.json()
-                return result
+        for _ in range(5):
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(url, json=payload) as response:
+                        result = await response.json()
+                        return result
+            except:
+                await asyncio.sleep(5)
+                
 
     async def success(self, message: str):
         logger.success(f"{self.name}{message}")
