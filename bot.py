@@ -63,8 +63,25 @@ async def http_get(url: str, referer: str):
         "Sec-Fetch-Site": "same-origin",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.203"
     }
+    proxy = None
+
+    if settings:
+        proxy_data = settings.get("mobile_proxy")
+
+        if proxy_data:
+            ip = proxy_data['ip']
+            if proxy_data["change_url"]:
+                async with aiohttp.ClientSession() as sess:
+                    async with sess.get(proxy_data["change_url"]) as resp:
+                        print(await resp.text())
+                    # if proxy_data["get_ip"]:
+                    #     async with sess.get(proxy_data["get_ip"]) as resp:
+                    #         ip = await resp.text()
+                    #         print(ip)
+            proxy = f"{proxy_data['type']}://{proxy_data['login']}:{proxy_data['password']}@{ip}"
+    # print(proxy)
     async with aiohttp.ClientSession() as sess:
-        async with sess.get(url, headers=headers) as resp:
+        async with sess.get(url, headers=headers, proxy=proxy) as resp:
             return await resp.text()
 
 class TelegramSession:
@@ -285,6 +302,7 @@ username: @{self.me.username}
                             try:
                                 res = await http_get(f"https://randomgodbot.com/api/lottery/requestCaptcha.php?userId={self.me.id}&startParam={start_param}", f"https://randomgodbot.com/api/lottery/?tgWebAppStartParam={start_param}")
                             except Exception as e:
+                                res = str(e)
                                 await self.error(f"Не удалось вступить в розыгрыш в RandomGodBot, {e}")
 
                         else:

@@ -1,5 +1,12 @@
 {
   "bot_token": "",
   "user_id": 123,
-  "delay": "10 120"
+  "delay": "1 2",
+  "mobile_proxy": {
+    "type": "http",
+    "login": "",
+    "password": "",
+    "change_url": "",
+    "ip": ""
+  }
 }
