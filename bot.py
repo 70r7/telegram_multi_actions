@@ -10,7 +10,7 @@ from random import choice, randint
 from pyrogram.raw.types.messages.bot_callback_answer import BotCallbackAnswer
 from pyrogram.client import Client
 from pyrogram.types import Message, User
-from pyrogram.errors import FloodWait, UserChannelsTooMuch, UserAlreadyParticipant
+from pyrogram.errors import FloodWait, UserChannelsTooMuch, UserAlreadyParticipant, ChannelsTooMuch
 
 from typing import Union, List
 from re import match
@@ -237,7 +237,7 @@ username: @{self.me.username}
                     await self.info(f'FloodWait: {error.value} сек.')
                     await asyncio.sleep(error.value) #type: ignore
  
-                except UserChannelsTooMuch:
+                except ChannelsTooMuch:
                     await self.info(f'Количество чатов превышено. Пытаюсь выйти из рандомного чата')
                     chats = []
                     async for dialog in app.get_dialogs():  #type: ignore
