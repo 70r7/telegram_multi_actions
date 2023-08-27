@@ -281,7 +281,11 @@ username: @{self.me.username}
             if message_id == -1:
                 message_id = await self._search_post_with_button(chat_id, app)
             
-            message = await app.get_messages(chat_id, message_id)
+            message = None
+            try:
+                message = await app.get_messages(chat_id, message_id)
+            except Exception as e:
+                return self.error(f"Не удалось получить сообщение с кнопкой. {e}")
             # print(message)
 
             if not isinstance(message, Message):
