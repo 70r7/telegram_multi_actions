@@ -260,7 +260,7 @@ username: @{self.me.username}
     
 
     async def start_ref_bot(self, url):
-        parsed_url = urlparse(res)
+        parsed_url = urlparse(url)
         query = parsed_url.query.split('=')
         async with self.client as app:
             res = await app.send_message(chat_id=parsed_url.path.split('/')[1], text=f"/{query[0]} {' '.join(query[1:])}")
