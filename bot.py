@@ -304,7 +304,7 @@ username: @{self.me.username}
                             start_param = parsed_url.query.split("&")[0].replace("startapp=", "")
 
                             try:
-                                res = await http_get(f"https://randomgodbot.com/api/lottery/requestCaptcha.php?userId={self.me.id}&startParam={start_param}", f"https://randomgodbot.com/api/lottery/?tgWebAppStartParam={start_param}")
+                                res = await http_get(f"https://srv44.vps-server.ru/api/lottery/requestCaptcha.php?userId={self.me.id}&startParam={start_param}", f"https://randomgodbot.com/api/lottery/?tgWebAppStartParam={start_param}")
                             except Exception as e:
                                 res = str(e)
                                 await self.error(f"Не удалось вступить в розыгрыш в RandomGodBot, {e}")
