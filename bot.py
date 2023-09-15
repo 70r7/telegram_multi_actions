@@ -5,12 +5,13 @@ from errors.exceptions import EmptyFile, WrongProxyFormat
 
 from urllib.parse import urlparse
 
-from random import choice, randint
+from random import  randint
 
 from pyrogram.raw.types.messages.bot_callback_answer import BotCallbackAnswer
+from pyrogram.enums import ChatType
 from pyrogram.client import Client
-from pyrogram.types import Message, User
-from pyrogram.errors import FloodWait, UserChannelsTooMuch, UserAlreadyParticipant, ChannelsTooMuch
+from pyrogram.types import Message, User, Dialog, Chat
+from pyrogram.errors import FloodWait, UserAlreadyParticipant, ChannelsTooMuch
 
 from typing import Union, List
 from re import match
@@ -238,15 +239,16 @@ username: @{self.me.username}
                     await asyncio.sleep(error.value) #type: ignore
  
                 except ChannelsTooMuch:
-                    await self.info(f'Количество чатов превышено. Пытаюсь выйти из рандомного чата')
+                    await self.info('Количество чатов превышено. Пытаюсь выйти из рандомного чата')
                     chats = []
                     async for dialog in app.get_dialogs():  #type: ignore
-                        if dialog.chat.id < 0:
-                            chats.append(dialog.chat.id)
-
-                    chat = choice(chats)
-                    await app.leave_chat(chat_id=chat)
-                    await self.success(f'Успешно вышел из чата/канала `{chat}`')
+                        dialog: Dialog
+                        if dialog.chat.id < 0 and dialog.chat.type in (ChatType.SUPERGROUP, ChatType.CHANNEL, ChatType.GROUP):
+                            chats.append(dialog.chat)
+                        
+                    pop_chat: Chat = chats[-1]
+                    await app.leave_chat(chat_id=pop_chat.id)
+                    await self.success(f'Успешно вышел из чата/канала `{pop_chat.title}/{pop_chat.id}`')
 
                 except UserAlreadyParticipant:
                     await self.error(f"Не удалось вступить в {join_link}. Я уже состою в этом чате")
