@@ -11,7 +11,8 @@ from pyrogram.raw.types.messages.bot_callback_answer import BotCallbackAnswer
 from pyrogram.enums import ChatType
 from pyrogram.client import Client
 from pyrogram.types import Message, User, Dialog, Chat
-from pyrogram.errors import FloodWait, UserAlreadyParticipant, ChannelsTooMuch
+from pyrogram.errors import FloodWait, UserAlreadyParticipant
+from pyrogram.errors.exceptions.bad_request_400 import ChannelsTooMuch
 
 from typing import Union, List
 from re import match
