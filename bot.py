@@ -11,7 +11,7 @@ from pyrogram.raw.types.messages.bot_callback_answer import BotCallbackAnswer
 from pyrogram.enums import ChatType
 from pyrogram.client import Client
 from pyrogram.types import Message, User, Dialog, Chat
-from pyrogram.errors import FloodWait, UserAlreadyParticipant, ChannelsTooMuch, UserChannelsTooMuch
+from pyrogram.errors import FloodWait, UserAlreadyParticipant, ChannelsTooMuch, UserChannelsTooMuch, PeerIdInvalid
 from pyrogram.errors.exceptions.bad_request_400 import ChannelsTooMuch as ctm
 
 from typing import Union, List
@@ -240,15 +240,23 @@ username: @{self.me.username}
                     await asyncio.sleep(error.value) #type: ignore
  
                 except (ChannelsTooMuch, ctm, UserChannelsTooMuch):
-                    await self.info('Количество чатов превышено. Пытаюсь выйти из рандомного чата')
+                    await self.info('Количество чатов превышено. Пытаюсь выйти из нижнего чата')
                     chats = []
                     async for dialog in app.get_dialogs():  #type: ignore
                         dialog: Dialog
                         if dialog.chat.id < 0 and dialog.chat.type in (ChatType.SUPERGROUP, ChatType.CHANNEL, ChatType.GROUP):
                             chats.append(dialog.chat)
-                        
-                    pop_chat: Chat = chats[-1]
-                    await app.leave_chat(chat_id=pop_chat.id)
+                    for i in range(20):
+                        pop_chat: Chat = chats[-1 - i]
+                        if i == 19:
+                            return self.error("Не удалось выйти из чата. Пропускаю этот аккаунт")
+                        try:
+                            await app.leave_chat(chat_id=pop_chat.id)
+                            break
+                        except PeerIdInvalid:
+                            continue
+
+                    
                     await self.success(f'Успешно вышел из чата/канала `{pop_chat.title}/{pop_chat.id}`')
 
                 except UserAlreadyParticipant:
