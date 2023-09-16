@@ -11,8 +11,8 @@ from pyrogram.raw.types.messages.bot_callback_answer import BotCallbackAnswer
 from pyrogram.enums import ChatType
 from pyrogram.client import Client
 from pyrogram.types import Message, User, Dialog, Chat
-from pyrogram.errors import FloodWait, UserAlreadyParticipant
-from pyrogram.errors.exceptions.bad_request_400 import ChannelsTooMuch
+from pyrogram.errors import FloodWait, UserAlreadyParticipant, ChannelsTooMuch, UserChannelsTooMuch
+from pyrogram.errors.exceptions.bad_request_400 import ChannelsTooMuch as ctm
 
 from typing import Union, List
 from re import match
@@ -239,7 +239,7 @@ username: @{self.me.username}
                     await self.info(f'FloodWait: {error.value} сек.')
                     await asyncio.sleep(error.value) #type: ignore
  
-                except ChannelsTooMuch:
+                except (ChannelsTooMuch, ctm, UserChannelsTooMuch):
                     await self.info('Количество чатов превышено. Пытаюсь выйти из рандомного чата')
                     chats = []
                     async for dialog in app.get_dialogs():  #type: ignore
