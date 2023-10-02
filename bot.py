@@ -266,8 +266,16 @@ username: @{self.me.username}
                     await self.success(f'Вступил в чат `{joined_chat.title}` `[`{join_link}`]`')
                     break
 
-    async def leave_chat(self):
-        raise NotImplementedError
+    async def leave_chat_all(self):
+        async with self.client as app:
+            async for dialog in app.get_dialogs():  #type: ignore
+                dialog: Dialog
+                try:
+                    await app.leave_chat(dialog.chat.id)
+                except Exception as e:
+                    print(e)
+            
+            await self.success("Вышел из всех чатов")
     
 
     async def start_ref_bot(self, url):
@@ -306,7 +314,7 @@ username: @{self.me.username}
                 res = None
                 try:
                     res = await message.click(button_id)
-                    print(res)
+
                     if isinstance(res, str) and res.startswith("https://t.me"):
                         parsed_url = urlparse(res)
                         query = parsed_url.query.split('=')
@@ -368,6 +376,14 @@ async def joiner():
             await ts.join_chat(link)
         
         await asyncio.sleep(randint(min_delay, max_delay))
+
+    await send_end_message()
+
+async def unsub():
+    for sess in session_files:
+        ts = TelegramSession(sess, proxy=proxies_json.get(sess) if proxies_json else "")
+        await ts.start()
+        await ts.leave_chat_all()
 
     await send_end_message()
 
@@ -440,6 +456,7 @@ if __name__ == "__main__":
     user_action = int(input('\n1. Telegram Mass Joiner\n'
                             '2. Telegram Mass Click Inline Buttons\n'
                             '3. Telegram Send Start Command With Referral Link\n'
+                            '4. Выйти со всех чатов\n'
                             'Выберите ваше действие: '))
     
 
@@ -454,6 +471,9 @@ if __name__ == "__main__":
         
         case 3:
             asyncio.run(ref_clicker())
+
+        case 4:
+            asyncio.run(unsub())
 
         case _:
             logger.error('Такой функции не обнаружено')
